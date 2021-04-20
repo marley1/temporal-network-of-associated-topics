@@ -1,0 +1,71 @@
+Topic	Prevalance	Percentage
+"Advertising, Endorsement, and Sponsorship"	168.11542	1%
+Auctions and Bargaining Behavior	125.30536	1%
+Automotive Vehicles	119.54042	1%
+Brand Marketing	153.26384	1%
+Buyer-Supplier Relationships	163.06522	1%
+Cattle Farming	89.20416	1%
+Child and Youth Services	101.98442	1%
+Choice and Decision Processes	188.62757	2%
+Choice Modelling	228.00457	2%
+"Coaching, Counselling, and Therapy"	145.63563	1%
+Commercial Innovation	273.41025	2%
+Consumer Ethnocentrism	121.6874	1%
+"Credit, Loans, Debt, and Repayment"	113.03276	1%
+Cultural Orientation	162.83476	1%
+Customer Service Delivery and Quality	234.92354	2%
+Data Mining Algorithms	276.35193	2%
+Data Security	80.95368	1%
+Domestic Energy Consumption	217.3645	2%
+Employee Behavior	161.95152	1%
+Ethics and Compliance	191.0424	2%
+Food Contamination and Safety	88.7422	1%
+Food Sensations and Acceptance	146.81834	1%
+Food Waste	92.10255	1%
+Gambling	80.44571	1%
+Green Consumption	201.65957	2%
+Health and Clinical Services	187.93202	2%
+Health Education and Intervention	224.55626	2%
+"Healthy Eating, Diet, and Nutrition"	208.36155	2%
+Household Income and Spend	189.04233	2%
+Illicit Substance Treatment	146.84734	1%
+Impulsive Spending	156.47102	1%
+Information Systems and Software	295.98729	2%
+Land Management	164.30171	1%
+Latent Variable Analysis	374.56646	3%
+Loyalty Programs	102.8354	1%
+Macroeconomics	202.72023	2%
+Market Equilibrium and Competition	216.73778	2%
+Mental Health Treatment	213.11892	2%
+Mobile Phone Services and Applications	109.55787	1%
+Multi-Channel Purchase and Promotion	179.15773	2%
+Multisensory and Atmospheric Effects	128.43203	1%
+Nanoparticle Products	123.40145	1%
+Negative Consumer Sentiment	131.59454	1%
+Network Optimization	178.36386	2%
+Nursing and Midwifery	220.44166	2%
+Online Shopping	215.37324	2%
+Organic and Genetically Modified Foods	219.91439	2%
+Power Grids and Energy Systems	184.30372	2%
+Pricing and Price Sensitivity	168.61782	1%
+Processed Foods	156.28031	1%
+Product Presentation	176.37259	1%
+Qualitative Research Methods	256.41122	2%
+Queuing Service Systems	178.80428	2%
+Seafood Carbon Labelling	92.34173	1%
+Sexual Risk Behavior	125.31287	1%
+Smoking and Alcoholism	77.09772	1%
+Social Lifestyle	181.59346	2%
+Social Media	172.85129	1%
+Social Norms and Identity	183.82501	2%
+Sport Consumption and Gamification	82.6726	1%
+Statistical Survey Analysis	357.03201	3%
+Stock Markets and Investment Trading	102.19406	1%
+Store Retailing	142.0498	1%
+Subliminal and Social Influence	207.59673	2%
+Supply Chain	212.8205	2%
+Technology Adoption	186.55835	2%
+Tourism	147.07746	1%
+"Transport, Travel, and Transit"	185.57041	2%
+Water Management	82.65027	1%
+Wines	65.183	1%
