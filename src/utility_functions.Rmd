@@ -1,0 +1,264 @@
+
+##### Dependencies
+
+```
+require(tidyverse)
+require(tidytext)
+require(stm)
+require(furrr)
+require(purrr)
+
+library(tidyverse)
+library(tidygraph)
+library(igraph)
+library(ggraph)
+library(corrr)
+```
+
+##### Function to tokenize textual documents into a long-format dataframe for miscellaneous pre-processing
+
+###### *Parameters:* 
+###### * *df (data_frame): a dataframe of dimensions (n-samples, n-features)*  
+###### * *min_freq (int): minimum number of occurrences for tokens (across corpus) to be retained*  
+###### * *min_length (int): minimum token length*  
+###### * *id_col (str): column name for unique document identifier*  
+###### * *text_col (str): column name for document text*  
+###### * *date_col (date): column name of document temporal metadata (e.g., a date-stamp)*  
+```
+func_preproc = function(df, min_freq, min_length, id_col, text_col, date_col) {
+    df %>%
+      select(all_of(c(id_col, text_col, date_col))) %>%
+      mutate(date_rank = dense_rank(select(df, {{date_col}})[[1]])) %>%
+      unnest_tokens(output = word,
+                    input = {{text_col}},
+                    to_lower = T) %>%
+      anti_join(get_stopwords()) %>%
+      filter(!str_detect(word, '[\\d]+'),
+             str_length(word) > {{min_length}}) %>%
+    add_count(word) %>%
+    filter(n > {{min_freq}}) %>%
+    select(-n) %>%
+    ungroup()
+  }
+```
+
+##### Function to convert pre-processed long-format dataframe to required corpus object for STM
+
+###### *Parameters:* 
+###### * *df_long (data_frame): a long-format dataframe of document tokens*  
+###### * *id_col (str): column name for unique document identifier*  
+###### * *daterank_col (int):  column name for rank of document datestamp*  
+###### * *word_col (): column name for document tokens*
+```
+func_corpus = function(df, id_col, daterank_col, word_col) {
+    # collapse tokens back to document
+    df_collapsed = df %>%
+      rename(doc_id = id_col,
+             word = word_col,
+             date_rank = daterank_col) %>%
+      group_by(date_rank, doc_id) %>%
+      mutate(text = paste(word, collapse = " ")) %>%
+      select(-{{word_col}}) %>%
+      slice(1) %>%
+      ungroup()
+    
+    # process data to build corpus for stm
+    processed = textProcessor(documents = df_collapsed$text,
+                              metadata = df_collapsed,
+                              stem = F)
+
+    # manipulate corpus to stm structure
+    out = prepDocuments(documents = processed$documents,
+                        vocab = processed$vocab,
+                        meta = processed$meta,
+                        lower.thresh = 5)
+    return(out)
+  }
+```
+
+##### Function to fit N specified STMs
+
+###### *Parameters:* 
+###### * *seq_K (vector): vector (of length N models to fit), listing the K number of topics to fit each STM to*  
+###### * *corpus_object (list): corpus object returned from func_corpus function*  
+###### * *daterank_col (int):  column name for rank of document date-stamp*  
+###### * *em_iterations (int): Maximum number of EM iteration, default = 75*
+###### * *initialization (str): Initialization method, default = 'Spectral*
+```
+func_train = function(seq_K, corpus_object, daterank_col, em_iterations=75, initialization="Spectral") {
+  many_models = tibble(K = seq_K) %>%
+    mutate(stm_models = future_map(K, ~stm(documents = corpus_object$documents,
+                                           vocab = corpus_object$vocab,
+                                           K = ., 
+                                           prevalence =~ s(date_rank),
+                                           max.em.its = 75,
+                                           data = corpus_object$meta,
+                                           init.type = initialization,
+                                           verbose = F)))
+  }
+```
+
+##### Function to compute evaluation metrics for STMs
+
+###### *Parameters:* 
+###### * *stm_models (tbl_df): nested table with stm models, returned from func_train function*  
+###### * *corpus_object (list): corpus object returned from func_corpus function*  
+```
+func_evaluation = function(stm_models, corpus_object) {
+  models %>%
+    mutate(exclusivity = purrr::map(stm_models, exclusivity),
+           semantic_coherence = purrr::map(stm_models, semanticCoherence, corpus$documents))
+  }
+```
+
+##### Function to retrieve desired STM  
+###### The desired STM is based on the comparison of STM model metrics returned from the func_evaluation function
+
+###### *Parameters:* 
+###### * *stm_models (data_frame): nested table with stm models, returned from func_train function*  
+###### * *K (int): number of topics desired STM was fit to*  
+```
+func_get_stm = function(models, K) {
+  k_result %>%
+    filter(K == K) %>%
+    pull(stm_models) %>%
+    .[[1]]
+  }
+```
+
+##### Function to retrieve document-topic and topic-word distribution
+
+###### *Parameters:* 
+###### * *model (STM): STM model object*  
+###### * *distribution (str): 'topics' for document-topic distribution and 'tokens' for topic-vocabulary distribution, default = 'tokens'*
+```
+func_results = function(model, distribution='tokens') {
+  if (!distribution %in% c('topics', 'tokens')) {
+    stop('unrecognized distribution: expecting either "topics" or "tokens"')
+  }
+  distribution_type = ifelse(distribution=='topics', 'gamma', 'beta')
+  tidy(stm_model, matrix = distribution_type)
+}
+```
+
+##### Function to compute topic associations within time windows
+
+###### *Parameters:* 
+###### * *doc_topic_prevalence (data_frame): dataframe of dimensions (n_documents, n_features). Feature columns include a time window column for each document, and topic prevalence columns for each document (e.g., one column for each topic, each listing the prevalence of the topic for each respective column)*  
+###### * *min_assoc (dbl): minimum correlation between topics to establish network edges*  
+###### * *time_slice_col (str): column name for document time-window*  
+###### * *topic_cols (list): list of column names for all topics in doc_topic_prevalence dataframe*  
+```
+func_topic_associations = function(doc_topic_prevalence, min_assoc = .5, time_slice_col, topic_cols) {
+  # formulate working dataframe
+  df = doc_topic_prevalence %>%
+        select(all_of(c(time_slice_col, topic_cols))) %>%
+        rename(time_window = {{time_slice_col}}) %>%
+        mutate(time_window = as.character(time_window))
+
+  # shell dataframe for complete results
+  df_topic_assocs = data.frame(x = as.character(),
+                               y = as.character(),
+                               r = as.double(),
+                               time_window = as.character())
+
+  # loop through time window intervals
+  for (var_window in unique(df$time_window)) {
+    # create dataframe capturing 'correlated' topics
+    df_assoc = df %>%
+               filter(time_window == var_window) %>%
+               select(all_of(topic_cols)) %>%
+               correlate(method = 'spearman', quiet=T) %>%
+               shave(upper = T) %>%
+               stretch(na.rm = T) %>%
+               filter(r >= min_assoc) %>%
+               mutate(time_window = var_window)
+    
+    # append year dataframe to complete results
+    df_topic_assocs = bind_rows(df_topic_assocs, df_assoc)
+  }
+  return(df_topic_assocs)
+}
+```
+
+##### Function to compute temporal network of associated topics
+
+###### *Parameters:* 
+###### * *doc_topic_prevalence (data_frame): dataframe of dimensions (n_documents, n_features). Feature columns include a time window column for each document, and topic prevalence columns for each document (e.g., one column for each topic, each listing the prevalence of the topic for each respective column)*  
+###### * *prev_time_col (str): column name for document time-window in doc_topic_prevalence dataframe*  
+###### * *prev_topic_cols (list): list of column names for all topics in doc_topic_prevalence dataframe*  
+
+###### * *topic_assocs (data_frame): dataframe of dimensions (n_topic_pairs x n_time_windows, n_features). Topic pairs are expected to be listed across two columns (one column per topic). Expected topic pair features include correlation coefficient for each pair of topics, and their respective time window. This dataframe is returned from the func_topic_associations function*  
+###### * *assocs_time_col (str): column name for document time-window in topic_assocs dataframe*  
+###### * *assocs_cor_col (str): column name for topic-pair correlation coefficient in topic_assocs dataframe*  
+```
+func_temporal_network = function(doc_topic_prevalence, prev_time_col, prev_topic_cols, topic_assocs, assocs_time_col, assocs_corr_col) {
+  # topic prevalence dataframe
+  df_prevalence = doc_topic_prevalence %>% 
+                    select(all_of(c(prev_time_col, prev_topic_cols))) %>% 
+                    rename(time_window = prev_time_col) %>%
+                    gather(topic, prevalence, -time_window) %>% 
+                    group_by(time_window, topic) %>% 
+                    summarise(prevalence=sum(prevalence, na.rm=T)) %>%
+                    ungroup()
+
+  # construct temporal network of associated topics
+  counter = 1
+  for (var_year in unique(pull(select(topic_assocs, assocs_time_col)))) {
+    # compute graph
+    cor_graph = as_tbl_graph(filter(rename(topic_assocs, time_window=assocs_time_col), 
+                                    time_window == var_year), directed = F) %>%
+                activate(edges) %>%
+                rename(weight = assocs_corr_col) %>%
+                activate(nodes) %>%
+                rename(topic = name) %>%
+                left_join(df_prevalence %>%
+                          filter(time_window == var_year)) %>%
+                mutate(time_window = as.character(time_window))
+
+    # compute node centrality metrics
+    df_centrality = cor_graph %>%
+                    mutate(group_info = as.factor(group_infomap(weights=weight, node_weights=prevalence)),
+                           degree = centrality_degree(),
+                           betweenness = centrality_betweenness(),
+                           closeness = centrality_closeness(),
+                           page_rank = centrality_pagerank()) 
+
+    # compute topology metrics
+    df_topology = df_centrality %>%
+                  mutate(edges = graph_size(),
+                         size = graph_size(),
+                         diameter = graph_diameter(),
+                         radius = graph_radius(),
+                         mean_distance = graph_mean_dist(),
+                         modularity = graph_modularity(group_info))
+
+    # standardise topological metric dataframe
+    cols_top = c('edges', 'size', 'diameter', 'radius', 'mean_distance', 'modularity', 'transitivity', 'density')
+    g = as.undirected(as.igraph(cor_graph %>% activate(nodes)), mode="collapse")
+    df_topology = df_topology %>%
+                  activate(nodes) %>%
+                  as_tibble() %>%
+                  mutate(transitivity = transitivity(g),
+                         density = graph.density(g)) %>%
+                  group_by(time_window) %>%
+                  slice(1) %>%
+                  select(all_of(c('time_window', cols_top)))
+    
+    # append annual graphs
+    if (counter == 1) {
+      networks_centrality = as_tibble(df_centrality)
+      networks_topology = df_topology
+    } else {
+      networks_centrality = bind_rows(networks_centrality, as_tibble(df_centrality))
+      networks_topology = bind_rows(networks_topology, df_topology)
+      }
+    
+    # update iteration step
+    counter = counter + 1
+  
+  }
+  # return results
+  return(list('centrality'=networks_centrality, 'topology'=networks_topology))
+}
+```
